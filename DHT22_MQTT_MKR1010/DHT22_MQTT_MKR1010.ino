@@ -3,6 +3,8 @@
     - note: edited the eztime.h file to comment out #define EZTIME_CACHE_EEPROM since MKR1010 has no EEPROM
     and then show data from a DHT22 on a web page served by the MKR1010 and
     push data to an MQTT server - uses library from https://pubsubclient.knolleary.net
+    
+    For wiring example see https://workshops.cetools.org/codelabs/CASA0014-2-Plant-Monitor/index.html?index=..%2F..index#7
 
     Connected Environments Lab
     May 2020
