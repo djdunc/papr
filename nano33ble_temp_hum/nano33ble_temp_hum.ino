@@ -90,21 +90,26 @@ void loop() {
 
   // if a central is connected to the peripheral:
   if (central) {
-    blinky(5);
+//    blinky(1);
 //    Serial.print("Connected to central: "); // print the central's BT address:
 //    Serial.println(central.address());      // turn on the LED to indicate the connection:
 
     // check the status while the central is connected:
     while (central.connected()) {
-      updateReadings();
-      delay(1000);                   // take a reading every second while something is listening
+      long currentMillis = millis();
+      // if 1000ms have passed, check the sensor:
+      if (currentMillis - previousMillis >= 2000) {
+        previousMillis = currentMillis;
+        updateReadings();
+      }
+      
     }
-      // when the central disconnects
-      blinky(3);
-//    Serial.print("Disconnected from central: ");
-//    Serial.println(central.address());
+    // when the central disconnects
+    blinky(3);
+    Serial.print("Disconnected from central: ");
+    Serial.println(central.address());
   }
-  delay(1000);
+  delay(100);
 }
 
 void updateReadings() {
@@ -115,12 +120,13 @@ void updateReadings() {
   temperatureChar.writeValue(temperature);
   humidityChar.writeValue(humidity);
 /*
+*/
   Serial.print("T=");
   Serial.print(temperature);
   Serial.print("C, RH=");
   Serial.print(humidity);
   Serial.println("%");
-*/
+
   
 /* some code to check the readings being sent over BLE
 
