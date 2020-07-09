@@ -1,6 +1,20 @@
+/*  Project PAPR July 2020
+ *  
+ *  Duncan Wilson https://github.com/djdunc/papr
+ *  
+ *  Hardware: Arduino MKR WIFI 1010 and a Closed Cube HDC1080 temp / hum I2C sensor
+ *  
+ *  HDC1080 connected via pin 11 and 12 (SCL / SDA)
+ *  
+ *  Sketch is used to create a central BLE that collects data from an Arduino Nano peripheral
+ *  
+ *  
+ */
+   
 #include <ArduinoBLE.h>
 #include <ClosedCube_HDC1080.h>
 
+// set up HDC10180 temp hum sensor
 ClosedCube_HDC1080 hdc1080;
 
  // BLE Environmental Sensing Service
@@ -11,12 +25,11 @@ float humidity;
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
+  delay(5000);
 
   // begin initialization
   if (!BLE.begin()) {
     Serial.println("starting BLE failed!");
-
     while (1);
   }
 
@@ -28,17 +41,15 @@ void setup() {
   Serial.print("Device ID=0x");
   Serial.println(hdc1080.readDeviceId(), HEX); // 0x1050 ID of the device 
 
-
-  Serial.println("BLE Central - GW for BLE devices");
-
   // start scanning for peripheral
+  Serial.println("BLE Central - GW for BLE devices");
   BLE.scan();
 }
 
 void loop() {
   // check if a peripheral has been discovered
   BLEDevice peripheral = BLE.available();
-
+  
   if (peripheral) {
     // discovered a peripheral, print out address, local name, and advertised service
     Serial.print("Found ");
@@ -54,8 +65,6 @@ void loop() {
       BLE.stopScan();
 
       getTempHumData(peripheral);
-
-
 
       // peripheral disconnected, start scanning again
       BLE.scan();
@@ -123,7 +132,7 @@ void getTempHumData(BLEDevice peripheral) {
       tChar.readValue(tempVal, 4);
       Serial.print(tempVal[0]);
       Serial.print(" C ");
-  
+   
       float humVal[4]; // hold the characteristic's bytes
       hChar.readValue(humVal, 4);
       Serial.print(humVal[0]);
@@ -138,7 +147,6 @@ void getTempHumData(BLEDevice peripheral) {
       Serial.print(humidity);
       Serial.println("%");
       delay(5000);
-
 
     }
   }
