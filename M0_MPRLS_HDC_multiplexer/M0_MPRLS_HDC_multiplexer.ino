@@ -11,7 +11,6 @@
  */
 
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
 #include <Adafruit_MPRLS.h>
 #include <ClosedCube_HDC1080.h>
 
