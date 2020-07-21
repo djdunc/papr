@@ -8,9 +8,24 @@
 
 */
 
+
+/* COMMENTS:
+
+    All greyed out areas (commented areas) that are not needed
+    should be deleted once the code has been tested and verified
+
+    There are duplicate areas or variables that we don't need.
+
+
+
+
+*/
+
+
+
 #include <avr/wdt.h>
 #include <Wire.h>
-
+//#include "Adafruit_MPRLS.h" (Honeywell sensors)
 
 //PINS used:
 int lowBattWarning = 8; //low battery warning LED (orange)
@@ -21,11 +36,11 @@ int pinBattery = A0; // analogue input pin for battery level
 
 
 //Variables:
-int batteryVoltage = 0;
+//int batteryVoltage = 0;
 int batteryLevel; //varialbe to store the battery level
 int batterycounting = 0; //variable to store the counting for the battery check during the while function
 int powerUp = 0; //variable to check if it has been just switched on
-bool stop;// = true;
+//bool stop;// = true;
 int counting = 0;
 int overallCounter = 0;
 
@@ -51,7 +66,7 @@ int fault = 0;    //to tell if there is a fault and which one:
    Fault 102: Faulty sensors start up
    Fault 103: very low pressure sensors
    Fault 104: very high pressure sensors
-   Fault 105:
+   Fault 105: ...
 
    Fault 1001: Watch Dog timer timed out... Don't think we could see this one... Anyway, it should reset the Arduino
 
@@ -61,29 +76,47 @@ int fault = 0;    //to tell if there is a fault and which one:
 float fullSpeedSensor_1 = 0.0F; // variable to store the value coming from the pressure sensor when fully powered
 float restSensor_1 = 0.0F;  // variable to store the value coming from the pressure sensor when first swtiched ON (at rest)
 float sensor_1 = 0.0F;  // variable to store the value coming from the pressure sensor
-String dataSensor_1 = ""; //variable where to store incoming data
-char c_1; // variable where we store incoming data
+//String dataSensor_1 = ""; //variable to store incoming data
+//char c_1; // variable to store incoming data
 
 float fullSpeedSensor_2 = 0.0F; // variable to store the value coming from the pressure sensor when fully powered
 float restSensor_2 = 0.0F;  // variable to store the value coming from the pressure sensor when first swtiched ON (at rest)
 float sensor_2 = 0.0F;  // variable to store the value coming from the pressure sensor
-String dataSensor_2 = ""; //variable where to store incoming data
-char c_2; // variable where we store incoming data
+//String dataSensor_2 = ""; //variable to store incoming data
+//char c_2; // variable to store incoming data
 
 float fullSpeedSensor_3 = 0.0F; // variable to store the value coming from the pressure sensor when fully powered
 float restSensor_3 = 0.0F;  // variable to store the value coming from the pressure sensor when first swtiched ON (at rest)
 float sensor_3 = 0.0F;  // variable to store the value coming from the pressure sensor
-String dataSensor_3 = ""; //variable where to store incoming data
-char c_3; // variable where we store incoming data
+//String dataSensor_3 = ""; //variable to store incoming data
+//char c_3; // variable to store incoming data
 
 
 void setup() {
   pinMode(fan, OUTPUT); //Fan as an Output
   pinMode(buzzer, OUTPUT); //Buzzer
-  analogWrite (fan, 0); //fan PWM speed 0-255
+  analogWrite (fan, 0); //fan speed, PWM speed 0-255
   digitalWrite (buzzer, LOW);
   digitalWrite (lowBattWarning, LOW);
   Wire.begin();        // join i2c bus (address optional for master)
+
+  /* mpr.begin(); we should include an 'if' case to check that the sensors are online before starting the void loop ();
+
+    Example of the above:
+
+        if (!mpr.begin()) {
+    Serial.println("Failed to communicate with MPRLS sensor, check wiring incl. power");
+    while (1) {
+      delay(100);
+    }
+    }
+    Serial.println("Found MPRLS sensor");
+    delay(100);
+
+    we have to call each sensor by address or multiplex them (call them by address should be something like mpr.begin (0xXX, &Wire); {where XX = address hex number}
+
+  */
+
   Serial.begin(9600);  // start serial for output
   watchdogSetup(); // to set up watchdog parameters
 }
@@ -112,9 +145,9 @@ void watchdogSetup(void) {
 
 
 void loop() {
-  
+
   wdt_reset(); // reset WDT
-  
+
   if (powerUp == 0) { //to let the system stabilize on start up. We could add a sequence for the buzzer to indicate starting up...
     delay(2000);
   }
@@ -122,7 +155,27 @@ void loop() {
   wdt_reset(); // reset WDT
 
   //time to read all sensors:
-  /*
+
+  /* Reading sensors from MPRLS Breakout PCB's:
+
+      Either we call the address of each sensor or we multiplex them to read the data.
+
+      The example below won't work if we don't do the above.
+
+     sensor_1 = mpr.readPressure(); hPa
+     sensor_1 = sensor_1/68.947572932; (PSI)
+
+     sensor_2 = mpr.readPressure(); hPa
+     sensor_2 = sensor_2/68.947572932; (PSI)
+
+     sensor_3 = mpr.readPressure(); hPa
+     sensor_3 = sensor_3/68.947572932; (PSI)
+
+  */
+
+
+  /* This is to communicate with another Arduino and get data through a 2 wire coms.    
+
     Wire.requestFrom(8, 7, stop);    // request 7 bytes from slave device #8
 
     while (Wire.available()) { // slave may send less than requested
@@ -158,7 +211,7 @@ void loop() {
 
   // checking those readings...
 
-  //batteryVoltage = (batteryLevel * 6.44 / 1000) + 12; // Using a zener of 12V and a voltage divider (R+R) on pinBattery [so (3.22mV * 2 * batteryLevel)+12 ]. We measure last resistor to ground.
+  //batteryVoltage = (batteryLevel * 6.44 / 1000) + 12; // Using a zener of 12V and a voltage divider (R+R) on pinBattery [so (3.22mV * 2 * batteryLevel)+12 ]. We measure last resistor to ground. We don't need this running on Arduino. To be used somewhere else...
 
   if (batteryLevel < 373) {  // checking battery level is ok, if not report the fault. Low battery fault = {[(3.6V*4)-12]/2}/3.22mV*1000
     fault = 101;
@@ -183,7 +236,7 @@ void loop() {
 
   wdt_reset(); // reset WDT
 
-  if (powerUp == 2 /*|| powerUp = 3*/) { //here we could deal with the faults system, check every sensor and battery and create a fault system
+  if (powerUp == 2) { //here we could deal with the faults, check every sensor and the battery and create a fault system (mainly critical faults so we don't go or stay in the operation room). Safety faults?
     if (restSensor_1 < 10 || restSensor_1 > 1000) { // checking sensors are ok @rest, if not report the fault. We can do one of these for each sensor
       fault = 102;
     }
@@ -327,7 +380,7 @@ void loop() {
   wdt_reset(); // reset WDT
 
   if (fault > 50) { // When there is an unrecoverable fault in the system we are going full speed!! And as loud and bright as possible..
-    analogWrite (fan, 255);
+    analogWrite (fan, 255); //do we want to push the fan to full speed immediately or shall we try to understand what's going on before doing it? (filter blocked + full speed won't help for example)
     if (fault == 101) {
       digitalWrite (lowBatteryLED, HIGH);
     }
