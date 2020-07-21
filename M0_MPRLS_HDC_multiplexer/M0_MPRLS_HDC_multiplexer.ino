@@ -12,7 +12,7 @@
 
 #include <Wire.h>
 #include <Adafruit_MPRLS.h>
-#include <ClosedCube_HDC1080.h>
+#include "ClosedCube_HDC1080.h" // note had to edit the .cpp in docs/arduino/libraries folder to make delay 20 not 9
 
 /************************* Configure address of multiplexer *****************************/
 #define TCAADDR 0x70
@@ -118,7 +118,6 @@ void getPressureData(){
 }
 
 void getTempHumData() {
-  delay(20); // was seeing an error of temp being 125 whilst humidity ok - pause before reading - needs 20 (!)
   temperature = hdc1080.readTemperature();
   humidity = hdc1080.readHumidity();
   Serial.print("T=");
