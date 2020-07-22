@@ -48,9 +48,7 @@ int status = WL_IDLE_STATUS;
 
 //Set up the wifi client
 WiFiClient client;
-
 Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, MQTT_SERVERPORT, MQTT_USERNAME, MQTT_KEY);
-
 // You don't need to change anything below this line!
 #define halt(s) { Serial.println(F( s )); while(1);  }
 
@@ -91,31 +89,40 @@ float   pressure_PSI = 0;
 double  batteryLevel = 0;  
 double  batteryResolution = 0.00322265625; // used to convert voltage on pin A0 3.3V / 1024
 
-int     fanBaselineSpeed = 200;   // this is the PWM value to control the fan at "ideal" speed
-int     fanSpeed = 0;             // this is the PWM value to control the fan = 0 to 255
-float   p1H = 0;
-float   p2L = 0;
-float   p3 = 0;
-float   p1H_start = 0;
+float   p1H = 0;              // current pressure readings - note p1 is high pressure in hood
+float   p2L = 0;              // note p2 is low pressure before fan (detects filter / leakage issues) 
+float   p3 = 0;               // note p3 is ambient air pressure
+float   p1H_start = 0;        // store starting values so we can watch for drift
 float   p2L_start = 0;
 float   p3_start = 0;
-float   p1H_target = 10;
-float   p2L_target = -10; 
-//      p3_target doesnt exist since it is ambient reading
-float   p1H_diff = 0;
-float   p2L_diff = 0; 
-int     pwmFanContol = 9;
-int     timeBetweenReadings = 1000;
+float   p1H_diff = 0;         // current reading minus start reading
+float   p2L_diff = 0;         
+float   p3_diff = 0;
+int     pChanged = 0;         // pressure changed - true or false - if true resets start pressure         
 
+/*************************                            *****************************/
+/************************* values to tweak operation  *****************************/
+/*************************                            *****************************/
+
+float   p1H_target = 40;      // target pressure hPa (campared to ambient) 
+float   p2L_target = -20;     // pressure in hPa below ambient (if above this create an alarm)
+float   p3_target = 2;        // amount of drift allowed in hPa (if observed beyond consecutively, resets baseline)
+int     fanSpeed = 200;       // this is the live PWM value to control the fan (0 to 255)
+int     fanTargetSpeed = 200; // this is the PWM value to control the fan at "ideal" speed
+int     loopDelay = 10000;     // delay between each each cycle of readings
+
+
+#define DEBUG                 // comment out to remove all serial prints and save memory / time
 
 
 void setup() {
   Serial.begin(9600);
   delay(2000);
 
+  #ifdef DEBUG
   Serial.println("\n\n\=====================================================");
-  Serial.println("PAPR Arduino Sketch for fan control and sensor data gathering. July 2020.");
-  Serial.println("");
+  Serial.println("PAPR Arduino Sketch for fan control and sensor data gathering. July 2020.\n\n");
+  #endif
 
   // Define wifi pins for the WINC1500 - needed for SAMD boards
   WiFi.setPins(WINC_CS, WINC_IRQ, WINC_RST, WINC_EN);
@@ -125,51 +132,57 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);  //  Turn the RED LED near the USB off
 
   // Declare PWM controller for fan
-  pinMode(pwmFanContol, OUTPUT);
+  pinMode(fanSpeed, OUTPUT);
 
 
   /************************* loop to startup HDC10180 sensor *****************************/
   for (int n = 0; n < (sizeof(hdcaddress) / sizeof(int)); n++) {
+
+    #ifdef DEBUG
     Serial.print("Looking for HDC at multiplexer: ");
     Serial.print(hdcaddress[n]);
+    #endif
 
     /* Initialise the sensor at the address of the address array*/
     tcaselect(hdcaddress[n]);
     // Default settings for HDC1080 sensors: - Heater off - 14 bit Temperature and Humidity Measurement Resolutions
     hdc1080.begin(0x40);
 
-    Serial.println(" - found HDC sensor");
-
   }
 
   /************************* check and startup MPRLS sensor *****************************/
   for (int n = 0; n < (sizeof(mpladdress) / sizeof(int)); n++) {
+    #ifdef DEBUG
     Serial.print("/nLooking for MPLRS at multiplexer: ");
     Serial.print(mpladdress[n]);
+    #endif
     /* Initialise the 1st sensor */
     tcaselect(mpladdress[n]);
     // setup MPRLS sensor
     if (! mpr.begin()) {
+      #ifdef DEBUG
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+      #endif
     }
-    Serial.println(" - found MPRLS sensor");
   }
 
-  // Initialise the Client
+  /************************* Initialise WIFI  *****************************/
+  #ifdef DEBUG
   Serial.print(F("\nInit the WiFi module..."));
+  #endif
   // check for the presence of the breakout
   if (WiFi.status() == WL_NO_SHIELD) {
+    #ifdef DEBUG
     Serial.println("WINC1500 not present");
+    #endif
     // don't continue:
     while (true);
   }
+  #ifdef DEBUG
   Serial.println("ATWINC OK!");
+  #endif
 
   WiFi.lowPowerMode(); // not 100% sure this is helping? check power profile with and without?
-
-  fanSpeed = fanBaselineSpeed;
-
-
   
 }
 
@@ -179,26 +192,17 @@ void loop() {
   MQTT_connect(); 
 
   // if this is the first time in loop then setup the pressure start readings
-  if(!p1H_start){
-    firstReadPressureSensors();  
-
-
-
-
-
-    /// TEMP UNTIL SENSOR 3 WHICH IS AMBIENT IS ADDED TO HARDWARE
-    p3_start = p2L_start;
-    Serial.println("\nSensor first readings:");
-    Serial.println(p1H_start);
-    Serial.println(p2L_start);
-    Serial.println(p3_start);
-
-
-    
+  if(!p1H_start || pChanged){
+    #ifdef DEBUG
+    Serial.println("\n\nFirst reading or change in pressure detected so reseting baseline. ");
+    #endif
+    firstReadPressureSensors();      
   }
 
   /************************* read sensors *****************************/
+  #ifdef DEBUG
   Serial.println("\n\nNew reading: ");
+  #endif
   readBatterySensor();
   readTempHumSensors();
   readPressureSensors();
@@ -208,15 +212,23 @@ void loop() {
 
 
   /************************* pause programme until time to measure *****************************/
-  delay(timeBetweenReadings);
+  delay(loopDelay);
 
 }
 
 void updateFanSpeed(){
 
-
+/*
+  if (fanSpeed <= 50 || fanSpeed >= 255) {
+    fanTargetSpeed = -fanTargetSpeed;
+  }
+  fanSpeed = fanSpeed + fanTargetSpeed;
+*/ 
 
   p1H_diff = p1H - p3_start; // want the difference in btwn p1H and starting ambient
+  p2L_diff = p2L - p3_start;
+  p3_diff = p3 - p3_start; 
+    
   if(p1H_diff > 10){
     fanSpeed = fanSpeed - (p1H_diff - 10);
     
@@ -226,11 +238,10 @@ void updateFanSpeed(){
   }
   if(fanSpeed < 0){fanSpeed = 0;}
   if(fanSpeed > 255){fanSpeed = 255;}  
-     
-  Serial.print("Fanspeed: ");
+    
+  #ifdef DEBUG
+  Serial.print("\nFanspeed: ");
   Serial.println(fanSpeed);
-
-
   Serial.println("\n==========================: ");
   Serial.print("Fanspeed: ");
   Serial.println(fanSpeed);
@@ -240,9 +251,9 @@ void updateFanSpeed(){
   Serial.println(p1H_start);
   Serial.print("p1H_target: ");
   Serial.println(p1H_target);
+  #endif
 
-
-  analogWrite(pwmFanContol, fanSpeed); 
+  analogWrite(fanSpeed, fanSpeed); 
   paprFan.publish(float(fanSpeed));
 }
 
@@ -253,8 +264,11 @@ void MQTT_connect() {
 
   // attempt to connect to Wifi network:
   while (WiFi.status() != WL_CONNECTED) {
+
+    #ifdef DEBUG
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(ssid);
+    #endif
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
     status = WiFi.begin(ssid, pass);
 
@@ -271,15 +285,21 @@ void MQTT_connect() {
     return;
   }
 
+  #ifdef DEBUG
   Serial.print("Connecting to MQTT... ");
+  #endif
 
   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
     Serial.println(mqtt.connectErrorString(ret));
+    #ifdef DEBUG
     Serial.println("Retrying MQTT connection in 5 seconds...");
+    #endif
     mqtt.disconnect();
     delay(5000);  // wait 5 seconds
   }
+  #ifdef DEBUG
   Serial.println("MQTT Connected!");
+  #endif
 }
 
 void readPressureSensors(){
@@ -303,16 +323,18 @@ void readPressureSensors(){
         paprP3.publish(pressure_hPa);
         break;
       default:
-        Serial.println("No MPRLS switch case found");
         break;
     }
   }
+  
+  #ifdef DEBUG
   Serial.print("\nSensor p1H:");
   Serial.print(p1H);
   Serial.print("\nSensor p2L:");
   Serial.print(p2L);
   Serial.print("\nSensor p3:");
   Serial.print(p3);  
+  #endif
   
 }
 
@@ -328,14 +350,15 @@ void getPressureData() {
   */
   // for time being just using one direct reading and using that
   pressure_hPa = mpr.readPressure();
-  /*
   pressure_PSI = pressure_hPa / 68.947572932;
-  Serial.print(", P=");
+
+  #ifdef DEBUG
+  Serial.print("\nP=");
   Serial.print(pressure_hPa);
   Serial.print(" hPa, P=");
   Serial.print(pressure_PSI);
   Serial.print(" PSI");
-  */
+  #endif
 
 }
 
@@ -344,9 +367,11 @@ void firstReadPressureSensors(){
   /************************* read MPRLS sensor *****************************/
   for (int n = 0; n < (sizeof(mpladdress) / sizeof(int)); n++) {
     tcaselect(mpladdress[n]);
-//    Serial.print("\nSensor:");
-//    Serial.print(mpladdress[n]);
-//    Serial.print(" = ");
+    #ifdef DEBUG
+    Serial.print("\nSensor:");
+    Serial.print(mpladdress[n]);
+    Serial.print(": ");
+    #endif
     getPressureData();
 
     switch (mpladdress[n]) {
@@ -363,13 +388,9 @@ void firstReadPressureSensors(){
         paprP3s.publish(pressure_hPa);
         break;
       default:
-        Serial.println("No MPRLS switch case found");
         break;
     }
-
-  }
-
-  
+  } 
 }
 
 void readTempHumSensors(){
@@ -377,9 +398,11 @@ void readTempHumSensors(){
   /************************* read HDC sensors *****************************/
   for (int n = 0; n < (sizeof(hdcaddress) / sizeof(int)); n++) {
     tcaselect(hdcaddress[n]);
-//    Serial.print("\nSensor:");
-//    Serial.print(hdcaddress[n]);
-//    Serial.print(" = ");
+    #ifdef DEBUG
+    Serial.print("\nSensor:");
+    Serial.print(hdcaddress[n]);
+    Serial.print(" = ");
+    #endif
 
     getTempHumData();
 
@@ -405,7 +428,6 @@ void readTempHumSensors(){
         paprH7.publish(humidity);
         break;
       default:
-        Serial.println("No HDC switch case found");
         break;
     }
   }  
@@ -417,11 +439,13 @@ void getTempHumData() {
   // sensors seem to be fairly stable on first read so dont think it is useful to multi sample
   temperature = hdc1080.readTemperature();
   humidity = hdc1080.readHumidity();
-//  Serial.print("T=");
-//  Serial.print(temperature);
-//  Serial.print("C, RH=");
-//  Serial.print(humidity);
-//  Serial.print("%");
+  #ifdef DEBUG
+  Serial.print("T=");
+  Serial.print(temperature);
+  Serial.print("C, RH=");
+  Serial.print(humidity);
+  Serial.print("%");
+  #endif
 
 
 }
@@ -432,8 +456,10 @@ void readBatterySensor(){
   
  // battery voltage is 14.8, 12V Zener being used 1k voltage divider circuit - analog read at 14.8V is 430 
   batteryLevel = 12+ (2 * batteryResolution * analogRead(pinBattery));
+  #ifdef DEBUG
   Serial.print("Battery: ");
   Serial.print(batteryLevel);
+  #endif
   paprBat.publish(batteryLevel);
     
 }
