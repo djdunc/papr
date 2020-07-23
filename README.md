@@ -13,3 +13,5 @@ M0_papr_data is the latest demo version running.
 Power circuit (14.8V battery for fan and 5V USB connection for arduino) sketch below
 
 ![Power Circuit](zPowerCircuit.jpeg)
+
+Note - would be useful to set PWM for fan to zero at start up to give some time between switching circuit on and fan starting.
