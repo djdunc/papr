@@ -33,7 +33,6 @@ float humidity = 0;
 /************************* Function to connect to Multiplexer *****************************/
 void tcaselect(uint8_t i) {
   if (i > 7) return;          // only eight I2C devices on multiplexer
- 
   Wire.beginTransmission(TCAADDR);
   Wire.write(1 << i);
   Wire.endTransmission();  

@@ -10,13 +10,17 @@
 
     Sketch builds on libraries including Adafruit_MQTT, Wifi101, ClosedCube_HDC1080, Adafruit_MPRLS
 
+    Note: 
+    - for ClosedCube library on multiplexer, had to edit the .cpp in docs/arduino/libraries folder to make delay 20 not 9
+    - make sure all SAMD BSP's are upto date in board manager - both adafruit and arduino ones
+
 */
 
 #include <SPI.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
 #include <WiFi101.h>
-#include <ClosedCube_HDC1080.h>
+#include <ClosedCube_HDC1080.h> 
 #include <Adafruit_MPRLS.h>
 #include <Wire.h>
 
@@ -109,7 +113,7 @@ float   p2L_target = -20;     // pressure in hPa below ambient (if above this cr
 float   p3_target = 2;        // amount of drift allowed in hPa (if observed beyond consecutively, resets baseline)
 int     fanSpeed = 200;       // this is the live PWM value to control the fan (0 to 255)
 int     fanTargetSpeed = 200; // this is the PWM value to control the fan at "ideal" speed
-int     loopDelay = 10000;     // delay between each each cycle of readings
+int     loopDelay = 1000;     // delay between each each cycle of readings
 
 
 #define DEBUG                 // comment out to remove all serial prints and save memory / time
