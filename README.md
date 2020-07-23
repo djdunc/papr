@@ -12,4 +12,4 @@ M0_papr_data is the latest demo version running.
 
 Power circuit (14.8V battery for fan and 5V USB connection for arduino) sketch below
 
-![Power Circuit]("zPowerCircuit.jpeg")
+![Power Circuit](zPowerCircuit.jpeg)
