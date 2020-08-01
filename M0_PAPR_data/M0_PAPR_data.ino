@@ -119,9 +119,31 @@ int     loopDelay = 1000;     // delay between each each cycle of readings
 #define DEBUG                 // comment out to remove all serial prints and save memory / time
 
 
+/******************************** Moving Average  ****************************************/
+const int queue_size = 10;
+
+float queue1[queue_size];
+float queue2[queue_size];
+float queue3[queue_size];
+
+int queue_index_1 = 0;
+int queue_index_2 = 0;
+int queue_index_3 = 0;
+
+float sum1 = 0.0f;
+float sum2 = 0.0f;
+float sum3 = 0.0f;
+
+
 void setup() {
   Serial.begin(9600);
   delay(2000);
+
+  for(int i = 0; i < queue_size; i++){
+    queue1[i] = 0.0f;
+    queue2[i] = 0.0f;
+    queue3[i] = 0.0f;
+  }
 
   #ifdef DEBUG
   Serial.println("\n\n\=====================================================");
@@ -311,7 +333,7 @@ void readPressureSensors(){
   /************************* read MPRLS sensor *****************************/
   for (int n = 0; n < (sizeof(mpladdress) / sizeof(int)); n++) {
     tcaselect(mpladdress[n]);
-    getPressureData();
+    getAveragePressureData(n+1);
 
     switch (mpladdress[n]) {
       case 1:
@@ -364,6 +386,66 @@ void getPressureData() {
   Serial.print(" PSI");
   #endif
 
+}
+
+void getAveragePressureData(int sensor) {
+  
+  float pressure_temp = mpr.readPressure();
+  
+  /**************** Calculate moving average ****************/
+  
+  switch(sensor) {
+    
+    case 1:
+      calculateMovingAverage(pressure_temp, queue1, sum1, queue_index_1);
+      break;
+
+    case 2:
+      calculateMovingAverage(pressure_temp, queue2, sum2, queue_index_2);
+      break;
+
+    case 3:
+      calculateMovingAverage(pressure_temp, queue3, sum3, queue_index_3);
+      break; 
+
+     default:
+      //error
+      Serial.println("Moving average switch error"); 
+  }
+}
+
+void calculateMovingAverage(float pressure, float* queue, float& sum, int& queue_index){
+
+  // subtract the last reading:
+  sum = sum - queue[queue_index];
+
+  queue[queue_index] = pressure;
+  
+  // add the reading to the total:
+  sum = sum + queue[queue_index];
+  
+  // advance to the next position in the array:
+  queue_index++;
+
+  // if we're at the end of the array...
+  if (queue_index >= queue_size) {
+    // ...wrap around to the beginning:
+    queue_index = 0;
+  }
+
+  // calculate the average:
+  pressure_hPa = sum / queue_size;
+  pressure_PSI = pressure_hPa / 68.947572932;
+
+
+  #ifdef DEBUG
+    Serial.print("\nP=");
+    Serial.print(pressure_hPa);
+    Serial.print(" hPa, P=");
+    Serial.print(pressure_PSI);
+    Serial.print(" PSI");
+  #endif
+  
 }
 
 void firstReadPressureSensors(){
