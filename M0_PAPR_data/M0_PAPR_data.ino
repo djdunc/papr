@@ -11,7 +11,8 @@
     Sketch builds on libraries including Adafruit_MQTT, Wifi101, ClosedCube_HDC1080, Adafruit_MPRLS
 
     Note: 
-    - for ClosedCube library on multiplexer, had to edit the .cpp in docs/arduino/libraries folder to make delay 20 not 9
+    - if getting temperature of 125 reported error is in ClosedCube library - on multiplexer, 
+      had to edit the .cpp in docs/arduino/libraries folder to make delay 20 not 9
     - make sure all SAMD BSP's are upto date in board manager - both adafruit and arduino ones
 
 */
@@ -104,21 +105,6 @@ float   p2L_diff = 0;
 float   p3_diff = 0;
 int     pChanged = 0;         // pressure changed - true or false - if true resets start pressure         
 
-/*************************                            *****************************/
-/************************* values to tweak operation  *****************************/
-/*************************                            *****************************/
-
-float   p1H_target = 40;      // target pressure hPa (campared to ambient) 
-float   p2L_target = -20;     // pressure in hPa below ambient (if above this create an alarm)
-float   p3_target = 2;        // amount of drift allowed in hPa (if observed beyond consecutively, resets baseline)
-int     fanSpeed = 200;       // this is the live PWM value to control the fan (0 to 255)
-int     fanTargetSpeed = 200; // this is the PWM value to control the fan at "ideal" speed
-int     loopDelay = 1000;     // delay between each each cycle of readings
-
-
-#define DEBUG                 // comment out to remove all serial prints and save memory / time
-
-
 /******************************** Moving Average  ****************************************/
 const int queue_size = 10;
 
@@ -134,11 +120,26 @@ float sum1 = 0.0f;
 float sum2 = 0.0f;
 float sum3 = 0.0f;
 
+/*************************                            *****************************/
+/************************* values to tweak operation  *****************************/
+/*************************                            *****************************/
+
+float   p1H_target = 40;      // target pressure hPa (campared to ambient) 
+float   p2L_target = -20;     // pressure in hPa below ambient (if above this create an alarm)
+float   p3_target = 2;        // amount of drift allowed in hPa (if observed beyond consecutively, resets baseline)
+int     fanSpeed = 200;       // this is the live PWM value to control the fan (0 to 255)
+int     fanTargetSpeed = 200; // this is the PWM value to control the fan at "ideal" speed
+int     loopDelay = 1000;     // delay between each each cycle of readings
+
+
+#define DEBUG                 // comment out to remove all serial prints and save memory / time
+
 
 void setup() {
   Serial.begin(9600);
   delay(2000);
 
+  // Setup arrays to hold moving average values for pressure sensors
   for(int i = 0; i < queue_size; i++){
     queue1[i] = 0.0f;
     queue2[i] = 0.0f;
