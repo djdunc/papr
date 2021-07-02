@@ -79,10 +79,12 @@ Using instructions above setup:
 
 ### MQTT set up
 
+```
 sudo apt update
 sudo apt install -y mosquitto mosquitto-clients
 sudo systemctl enable mosquitto.service
 mosquitto -v
+```
 
 192.168.10.1:1883
 
